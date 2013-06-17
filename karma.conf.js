@@ -16,6 +16,7 @@ files = [
   {pattern: 'test/index.html', watched: true, served: true, included: false},
   'node_modules/js-fixtures/fixtures.js',
   'test/setup.js',
+  'test/model.js',
   'test/specs/**/*.js'
 ];
 

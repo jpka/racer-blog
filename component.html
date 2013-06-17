@@ -1,10 +1,65 @@
-<element name="my-element">
+<element name="racer-blog" attributes="collectionPath">
   <template>
-    <style>
-      @host {}
-    </style>  
+    <button id="new" style="display:none;">+</button>
+    <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true"></racer-collection>
   </template>
   <script>
-    Polymer.register(this, {});
+    Polymer.register(this, {
+      ready: function() {
+        if (window.racer) {
+          this.racer = window.racer;  
+        }
+        this.$.new.addEventListener("click", this.addNew.bind(this))
+      },
+      set racer(racer) {
+        var self = this;
+
+        racer.ready(function(model) {
+          self.model = model;
+        });
+      },
+      set model(model) {
+        var self = this;
+
+        if (model.get("_page.authorized")) {
+          this._authorize();
+        } else {
+          this._unauthorize();
+        }
+        model.on("error", function(err) {
+          if (err.message === "unauthorized") {
+            self._unauthorize();
+          }
+        });
+        this.$.list.on("model:load", function() {
+          self.$.list.items.forEach(function(item, i) {
+            item.child.addEventListener("remove", function() {
+              self.$.list.del(i);
+            });
+          });
+          self.dispatchEvent(new CustomEvent("load"));
+        });
+        this.$.list.on("item:delete", function() {
+          self.dispatchEvent(new CustomEvent("post:delete"));
+        });
+        this.$.list.model = model;
+      },
+      _authorize: function() {
+        this.$.list.itemAttributes = {editable: true};
+        this.$.new.style.display = "block";
+      },
+      _unauthorize: function() {
+        this.$.list.itemAttributes = null;
+        this.$.new.style.display = "none";
+        this.$.list.items.forEach(function(item) {
+          item.child.editable = null;
+        });
+      },
+      addNew: function() {
+        this.$.list.push({
+          body: ""
+        });
+      }
+    });
   </script>
 </element>

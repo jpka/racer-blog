@@ -3,9 +3,31 @@
 <html>
   <head>
     <script src="/base/node_modules/Polymer/polymer.min.js"></script>
+    <script src="/base/test/model.js"></script>
     <link rel="import" href="/base/index.html"/>
+    <script>
+      var data = {
+        _page: {
+          authorized: true
+        },
+        blog: {
+          posts: [
+            {body: "#post1\n\nI am a merry post."},
+            {body: "#post2\n\nI am a merrier post."},
+            {body: "#post3\n\nI am the merriest post."}
+          ]
+        }
+      };
+      window.model = new Model(data);
+      window.racer = {
+        ready: function(cb) {
+          cb(window.model);
+        }
+      };
+    </script>
   </head>
   <body>
+    <racer-blog id="blog" collectionPath="blog.posts"></racer-blog>
   </body>
 </html>
 
