@@ -1,3 +1,53 @@
+<element name="smart-list">
+  <template>
+    <style>
+      @host {}
+    </style>  
+    <div id="container"></div>
+  </template>
+  <script>
+    Polymer.register(this, {
+      ready: function() {
+        var self = this;
+        this.children.forEach(function(node) {
+          self.$.container.appendChild(node);
+        });
+      },
+      get items() {
+        return this.$.container.childNodes;
+      },
+      push: function(node, props) {
+        this.insert(this.items.length, node, props);
+      },
+      unshift: function(node, props) {
+        this.insert(0, node, props);
+      },
+      insert: function(i, node, props) {
+        if (typeof node === "string") node = document.createElement(node);
+        if (props) {
+          for (prop in props) {
+            node[prop] = props[prop];
+          }
+        }
+        if (i >= this.items.length) {
+          this.$.container.appendChild(node);
+        } else {
+          this.$.container.insertBefore(node, this.items[i]);
+        }
+      },
+      get: function(id) {
+        return this.$.container.querySelector("#" + id);
+      },
+      remove: function(id) {
+        this.$.container.removeChild(this.get(id));
+      },
+      removeByIndex: function(index) {
+        this.$.container.removeChild(this.items[index]);
+      }
+    });
+  </script>
+</element>
+
 <element name="racer-element" attributes="at">
   <template>
     <style>
@@ -478,33 +528,14 @@ module.exports = {
   </script>
 </element>
 
-<element name="racer-list" extends="racer-element" attributes="listType itemType at reverse itemAttributes">
+<element name="racer-list" extends="racer-element" attributes="itemType at reverse itemAttributes">
+  <template>
+    <smart-list id="list"></smart-list>
+  </template>
   <script>
     Polymer.register(this, {
       get items() {
-        return this.list.items;
-      },
-      get list() {
-        if (this.child) return this.child;
-        this.child = document.createElement(this.listType || "div");
-        if (!this.child.insert) {
-          this.child.insert = function(i, node) {
-            if (i >= this.items.length) {
-              this.appendChild(node);
-            } else {
-              this.insertBefore(node, this.items[i]);
-            }
-          };
-        }
-        if (!this.child.items) {
-          this.child.items = this.child.children;
-        }
-        if (!this.child.removeByIndex) {
-          this.child.removeByIndex = function(i) {
-            this.removeChild(this.items[i]);
-          };
-        }
-        return this.child;
+        return this.$.list.items;
       },
       push: function(item) {
         this.insert(this.items.length, item);
@@ -513,7 +544,7 @@ module.exports = {
         this.insert(0, item);
       },
       insert: function(i, model) {
-        var length = this._model.insert(this.at, i, model || {});
+        this._model.insert(this.at, i, model || {});
       },
       del: function(i) {
         this._model.del(this.at, i, 1);
@@ -525,7 +556,6 @@ module.exports = {
         if (!this.itemType) throw new Error("itemType was not declared");
         wrapper.child = document.createElement(this.itemType);
         wrapper.model = this._model.at(this.at + "." + i);
-        wrapper.id = "r-" + i;
         if (this.itemAttributes) {
           for (attr in this.itemAttributes) {
             wrapper.child[attr] = this.itemAttributes[attr];
@@ -534,7 +564,8 @@ module.exports = {
         if (this.reverse) {
           i = this.items.length - i;
         }
-        this.list.insert(i, wrapper);
+        wrapper.id = "r-" + i;
+        this.$.list.insert(i, wrapper);
       },
       onModelLoad: function() {
         var key,
@@ -551,13 +582,13 @@ module.exports = {
         this.trigger("items:load");
       },
       onItemDelete: function(i) {
-        this.list.removeByIndex(i);
+        this.$.list.removeByIndex(i);
       },
       onItemCreate: function(i) {
         this.add(i);
       },
       onItemUpdate: function(i, data) {
-        this.list.items[i].update(data);
+        this.$.list.items[i].update(data);
       },
       onChange: function(i, data) {
         this.trigger("item:update", i, data);
@@ -572,7 +603,7 @@ module.exports = {
   </script>
 </element>
 
-<element name="smart-post" attributes="model editable" onmouseover="editModeOn()" onmouseout="editModeOff()" >
+<element name="smart-post" attributes="model editable">
   <template>
     <style>
       @host {
@@ -590,20 +621,26 @@ module.exports = {
         height: 386px;
         border: 2px solid black;
       }
-      #remove {
-        display: none;
+      button {
         position: absolute;
-        top: 0px;
-        right: 0px;
         background: none;
         border: none;
-        font-size: 15px;
         cursor: pointer;
       }
+      #save {
+        bottom: 5px;
+        right: 0px;
+      }
+      #remove {
+        top: 0px;
+        right: 0px;
+        font-size: 15px;
+      }
     </style>  
-    <button id="remove">X</button>
+    <button id="remove" style="display:none;">X</button>
     <div id="body" class="body"></div>
     <textarea id="editableBody" class="body" style="display:none;"></textarea>
+    <button id="save" style="display:none;">Save</button>
   </template>
   <script>
     require=(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({"proto":[function(require,module,exports){
@@ -613,8 +650,14 @@ module.exports = {
   _model: {},
 
   ready: function() {
-    this.$.editableBody.addEventListener("keyup", this.updateBody.bind(this));
+    var self = this;
+    this.$.editableBody.addEventListener("keyup", function() {
+      self.$.save.style.display = "block";
+    });
+    this.$.save.addEventListener("click", this.save.bind(this));
     this.$.remove.addEventListener("click", this.remove.bind(this));
+    this.addEventListener("mouseover", this.editModeOn);
+    this.addEventListener("mouseout", this.editModeOff);
   },
 
   set model(model) {
@@ -622,8 +665,8 @@ module.exports = {
       model = JSON.parse(model);
     }
     this._model = model;
+    this.$.editableBody.value = model.body;
     this.parseBody();
-    this.$.editableBody.innerText = model.body;
   },
   get model() {
     return this._model;
@@ -652,19 +695,21 @@ module.exports = {
     if (!this.onEditMode) return;
     this.$.editableBody.style.display = "none"; 
     this.$.body.style.display = "block"; 
+    this.parseBody();
     this.onEditMode = false;
   },
   parseBody: function() {
-    this.$.body.innerHTML = this._model.body ? this.parse(this._model.body) : "";
-  },
-  updateBody: function() {
-    this.model.body = this.$.editableBody.value;
-    this.parseBody();
+    this.$.body.innerHTML = this.parse(this.$.editableBody.value);
   },
   remove: function() {
     if (!this.parentNode) return;
     this.parentNode.removeChild(this);
     this.dispatchEvent(new CustomEvent("remove"));
+  },
+  save: function() {
+    this._model.body = this.$.editableBody.value;
+    this.$.save.style.display = "none";
+    this.dispatchEvent(new CustomEvent("save"));
   }
 };
 
@@ -1831,6 +1876,25 @@ if (typeof exports === 'object') {
 
 <element name="racer-blog" attributes="collectionPath">
   <template>
+    <style>
+      @host {
+        racer-blog {
+          display: block;
+          margin: 0 auto;
+          width: 600px;
+        }
+      }
+      #new {
+        margin: 0 auto;
+        border: none;
+        background: none;
+        font-size: 40px;
+        cursor: pointer;
+      }
+      #new:hover {
+        color: rgb(206, 26, 26);
+      }
+    </style>
     <button id="new" style="display:none;">+</button>
     <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true"></racer-collection>
   </template>

@@ -40,8 +40,8 @@ describe("racer-blog", function() {
   });
 
   it("pressing add generates an empty post at the top", function() {
-    var click = document.createEvent("MouseEvents");
-    click.initEvent("click");
+    var click = fixtures.window().document.createEvent("MouseEvents");
+    click.initEvent("click", true, false);
     element.$.new.dispatchEvent(click);
 
     expect(coll.items.length).to.equal(4);
@@ -49,8 +49,8 @@ describe("racer-blog", function() {
   });
 
   it("pressing post remove button deletes the post from the model", function(done) {
-    var click = document.createEvent("MouseEvents");
-    click.initEvent("click");
+    var click = fixtures.window().document.createEvent("MouseEvents");
+    click.initEvent("click", true, false);
 
     element.addEventListener("post:delete", function() {
       expect(model.delWasCalledWith).to.deep.equal(["blog.posts", 0, 1]);

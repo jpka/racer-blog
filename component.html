@@ -1,5 +1,24 @@
 <element name="racer-blog" attributes="collectionPath">
   <template>
+    <style>
+      @host {
+        racer-blog {
+          display: block;
+          margin: 0 auto;
+          width: 600px;
+        }
+      }
+      #new {
+        margin: 0 auto;
+        border: none;
+        background: none;
+        font-size: 40px;
+        cursor: pointer;
+      }
+      #new:hover {
+        color: rgb(206, 26, 26);
+      }
+    </style>
     <button id="new" style="display:none;">+</button>
     <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true"></racer-collection>
   </template>
