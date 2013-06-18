@@ -38,10 +38,10 @@
       get: function(id) {
         return this.$.container.querySelector("#" + id);
       },
-      remove: function(id) {
+      rm: function(id) {
         this.$.container.removeChild(this.get(id));
       },
-      removeByIndex: function(index) {
+      rmByIndex: function(index) {
         this.$.container.removeChild(this.items[index]);
       }
     });
@@ -533,65 +533,113 @@ module.exports = {
     <smart-list id="list"></smart-list>
   </template>
   <script>
+    function add(self, key) {
+      var wrapper = document.createElement("racer-element"),
+      attr;
+
+      if (!self.itemType) throw new Error("itemType was not declared");
+      wrapper.child = document.createElement(self.itemType);
+      wrapper.model = self._model.at(self.at + "." + key);
+      if (self.itemAttributes) {
+        for (attr in self.itemAttributes) {
+          wrapper.child[attr] = self.itemAttributes[attr];
+        }
+      }
+
+      wrapper.id = "r-" + key;
+
+      if (self._isArray) {
+        if (self.reverse) {
+          key = self.items.length - key;
+        }
+        self.$.list.insert(key, wrapper);
+      } else {
+        self.$.list[self.reverse ? "unshift" : "push"](wrapper);
+      }
+    }
+
     Polymer.register(this, {
       get items() {
         return this.$.list.items;
       },
       push: function(item) {
-        this.insert(this.items.length, item);
+        if (this._isArray) {
+          this.insert(this.items.length, item);
+        } else {
+          this.set(this.items.length, item);
+        }
       },
       unshift: function(item) {
+        if (!this._isArray) throw new Error("Can't unshift on an object!");
         this.insert(0, item);
       },
       insert: function(i, model) {
+        if (!this._isArray) throw new Error("Can't insert on an object!");
         this._model.insert(this.at, i, model || {});
       },
-      del: function(i) {
-        this._model.del(this.at, i, 1);
+      set: function(key, value) {
+        this._model.set(this.at + "." + key, value);
       },
-      add: function(i) {
-        var wrapper = document.createElement("racer-element"),
-        attr;
-
-        if (!this.itemType) throw new Error("itemType was not declared");
-        wrapper.child = document.createElement(this.itemType);
-        wrapper.model = this._model.at(this.at + "." + i);
-        if (this.itemAttributes) {
-          for (attr in this.itemAttributes) {
-            wrapper.child[attr] = this.itemAttributes[attr];
-          }
+      get: function(id) {
+        return this.$.list.get("r-" + id);
+      },
+      del: function(key) {
+        if (this._isArray) {
+          this._model.del(this.at, key, 1);
+        } else {
+          this._model.del(this.at + "." + key);
         }
-        if (this.reverse) {
-          i = this.items.length - i;
-        }
-        wrapper.id = "r-" + i;
-        this.$.list.insert(i, wrapper);
       },
       onModelLoad: function() {
         var key,
         data,
-        i = 0;
+        self = this;
 
         if (!this.at) throw new Error("at attribute must be specified");
         data = this._model.get(this.at);
 
-        for (i = 0; i < data.length; i++) {
-          this.add(i);
-        };
+        this._isArray = Array.isArray(data);
+
+        Object.keys(data).forEach(function(key) {
+          add(self, key);
+        });
 
         this.trigger("items:load");
       },
-      onItemDelete: function(i) {
-        this.$.list.removeByIndex(i);
+      onItemDelete: function(key) {
+        this.$.list.rm("r-" + key);
       },
-      onItemCreate: function(i) {
-        this.add(i);
+      onItemCreate: function(key) {
+        add(this, key);
       },
-      onItemUpdate: function(i, data) {
-        this.$.list.items[i].update(data);
+      onItemUpdate: function(key, data) {
+        var item;
+
+        if (this._isArray) {
+          item = this.$.list.items[key];
+        } else {
+          item = this.get(key);
+        }
+        item.update(data);
       },
-      onChange: function(i, data) {
-        this.trigger("item:update", i, data);
+      onChange: function(key, data) {
+        var ev = "";
+
+        if (this._isArray) {
+          ev = "update";
+        } else {
+          if (data) {
+            if (this.get(key)) {
+              ev = "update";
+            } else {
+              ev = "create";
+            }
+          } else {
+            ev = "delete";
+          }
+        }
+
+        this.trigger("item:" + ev, key, data);
       },
       onInsert: function(i) {
         this.trigger("item:create", i);
@@ -601,31 +649,37 @@ module.exports = {
       }
     });
   </script>
-</element>
+  </element>
 
 <element name="smart-post" attributes="model editable">
   <template>
     <style>
       @host {
-        * {
+        smart-post {
           position: relative;
           display: block;
           width: 600px;
-          height: 400px;
           margin: 10px;
+          border: 2px dashed black;
         }
       }
       .body {
         padding: 5px;
         width: 586px;
-        height: 386px;
-        border: 2px solid black;
+      }
+      #editableBody {
+        top: 0px;
+        left: 0px;
+        border: none;
       }
       button {
         position: absolute;
         background: none;
         border: none;
         cursor: pointer;
+      }
+      button:hover {
+        color: rgb(206, 26, 26);
       }
       #save {
         bottom: 5px;
@@ -688,7 +742,8 @@ module.exports = {
   editModeOn: function() {
     if (!this.editable) return;
     this.$.editableBody.style.display = "block"; 
-    this.$.body.style.display = "none";
+    this.$.editableBody.style.height = (this.$.body.clientHeight - 10) + "px"; 
+    this.$.body.style.display = "none"; 
     this.onEditMode = true;
   },
   editModeOff: function() {

@@ -12,13 +12,12 @@ describe("racer-blog", function() {
         authorized: true
       },
       blog: {
-        posts: [
-          {body: "body"},
-          {body: "another body"},
-          {body: "yet another body"}
-        ]
+        posts: {}
       }
     };
+    modelData.blog.posts[0] = {body: "body"};
+    modelData.blog.posts[1] = {body: "another body"};
+    modelData.blog.posts[2] = {body: "yet another body"};
     model = new fixtures.window().Model(modelData);
     element.racer = {
       ready: function(cb) {
@@ -53,7 +52,7 @@ describe("racer-blog", function() {
     click.initEvent("click", true, false);
 
     element.addEventListener("post:delete", function() {
-      expect(model.delWasCalledWith).to.deep.equal(["blog.posts", 0, 1]);
+      expect(model.delWasCalledWith).to.deep.equal(["blog.posts.0"]);
       expect(coll.items.length).to.equal(2);
       done();
     });

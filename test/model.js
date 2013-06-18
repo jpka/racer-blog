@@ -46,8 +46,17 @@ window.Model = function(modelData, populated) {
     at: function(path) {
       return new Model(this.digIn(path), true);
     },
+    get: function(path) {
+      var data = this.data;
+      if (path) data = this.digIn(path);
+      return data;
+    },
     set: function(path, value) {
-      this.data[path] = value;
+      var pathArr = path.split("."),
+      key = pathArr.pop();
+
+      this.digIn(pathArr.join("."))[key] = value;
+      this.emit(path, "change", value);
     },
     push: function(path, model) {
       return this.insert(path, this.digIn(path).length, model);
