@@ -59,13 +59,26 @@
     require=(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({"proto":[function(require,module,exports){
 module.exports=require('KQcwdn');
 },{}],"KQcwdn":[function(require,module,exports){
-var wjs = require("watchjs");
+function observeChildModelProperty(self, key) {
+  Object.defineProperty(self.child.model, key, {
+    set: function(value) {
+      if (this.turbo) {
+        self.set(key, value);
+      }
+      self._childModel[key] = value;
+    },
+    get: function() {
+      return self._childModel[key];
+    }
+  });
+}
 
 module.exports = {
   ready: function() {
     if (this.firstElementChild) {
       this.child = this.firstElementChild;
     }
+    this._childModel = {};
   },
   trigger: function() {
     var name = arguments[0],
@@ -80,7 +93,7 @@ module.exports = {
     if (on = this["on" + fname]) {
       on.apply(this, data);
     }
-    this.dispatchEvent(new CustomEvent(name, {detail: data}));
+    this.fire(name, data);
   },
   on: function(type, cb) {
     this.addEventListener(type, function(e) {
@@ -110,6 +123,13 @@ module.exports = {
     var self = this;
     this._model = model;
 
+    if (!this.child) {
+      this.child = document.createElement(this.childType || "div");
+      if (!this.child.model) this.child.model = {};
+    }
+
+    if (!this.turbo) this.child.addEventListener("save", this.save.bind(this));
+
     this.listen();
 
     if (model.get(this.at)) {
@@ -127,6 +147,9 @@ module.exports = {
     if (this.at) path = this.at + "." + path;
     this._model.del(path);
   },
+  set: function(key, value) {
+    this._model.set(this.at ? this.at + "." + key : key, value);
+  },
   listen: function() {
     var self = this;
     this._model.on("all", "**", function(path, ev, data, oldData) {
@@ -143,383 +166,34 @@ module.exports = {
       self.trigger.apply(self, args);
     });
   },
-  watchChildModel: function() {
-    var self = this;
-
-    Object.keys(self.child.model).forEach(function(key) {
-      wjs.watch(self.child.model, key, function(name, action, newValue) {
-        if (!self._model) return;
-        if (self.at) key = self.at + "." + key;
-        self._model.set(key, newValue);
-      });
-    });
-  },
   update: function(data) {
-    if (!this.child || !this.child.model || (!data && !this._model)) return;
-    this.child.model = data || this._model.get();
-    this.watchChildModel();
+    var data,
+    self = this,
+    key;
+    if (!this.child || !this.child.model || !this._model) return;
+    data = data || this._model.get();
+
+    for (key in data) {
+      if (!this._childModel[key]) {
+        observeChildModelProperty(self, key);
+      }
+      this._childModel[key] = data[key];
+    }
+  },
+  save: function() {
+    var key;
+    for (key in this._childModel) {
+      this.set(key, this._childModel[key]);
+    }
   },
   onModelLoad: function() {
     this.update();
   },
   onChange: function(name, value) {
-    if (!this.child || !this.child.model) return;
-    this.child.model[name] = value;
+    if (!this.child) return;
+    this._childModel[name] = value;
   }
 };
-
-},{"watchjs":1}],1:[function(require,module,exports){
-/**
- * DEVELOPED BY
- * GIL LOPES BUENO
- * gilbueno.mail@gmail.com
- *
- * WORKS WITH:
- * IE 9+, FF 4+, SF 5+, WebKit, CH 7+, OP 12+, BESEN, Rhino 1.7+
- *
- * FORK:
- * https://github.com/melanke/Watch.JS
- */
-
-"use strict";
-(function (factory) {
-    if (typeof exports === 'object') {
-        // Node. Does not work with strict CommonJS, but
-        // only CommonJS-like enviroments that support module.exports,
-        // like Node.
-        module.exports = factory();
-    } else if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(factory);
-    } else {
-        // Browser globals
-        window.WatchJS = factory();
-        window.watch = window.WatchJS.watch;
-        window.unwatch = window.WatchJS.unwatch;
-        window.callWatchers = window.WatchJS.callWatchers;
-    }
-}(function () {
-
-    var WatchJS = {
-        noMore: false
-    },
-    defineWatcher,
-    unwatchOne,
-    callWatchers;
-
-    var isFunction = function (functionToCheck) {
-            var getType = {};
-            return functionToCheck && getType.toString.call(functionToCheck) == '[object Function]';
-    };
-
-    var isInt = function (x) {
-        return x % 1 === 0;
-    };
-
-    var isArray = function(obj) {
-        return Object.prototype.toString.call(obj) === '[object Array]';
-    };
-
-    var isModernBrowser = function () {
-        return Object.defineProperty || Object.prototype.__defineGetter__;
-    };
-
-    var defineGetAndSet = function (obj, propName, getter, setter) {
-        try {
-                Object.defineProperty(obj, propName, {
-                        get: getter,
-                        set: setter,
-                        enumerable: true,
-                        configurable: true
-                });
-        } catch(error) {
-            try{
-                Object.prototype.__defineGetter__.call(obj, propName, getter);
-                Object.prototype.__defineSetter__.call(obj, propName, setter);
-            }catch(error2){
-                throw "watchJS error: browser not supported :/"
-            }
-        }
-    };
-
-    var defineProp = function (obj, propName, value) {
-        try {
-            Object.defineProperty(obj, propName, {
-                enumerable: false,
-                configurable: true,
-                writable: false,
-                value: value
-            });
-        } catch(error) {
-            obj[propName] = value;
-        }
-    };
-
-    var watch = function () {
-
-        if (isFunction(arguments[1])) {
-            watchAll.apply(this, arguments);
-        } else if (isArray(arguments[1])) {
-            watchMany.apply(this, arguments);
-        } else {
-            watchOne.apply(this, arguments);
-        }
-
-    };
-
-
-    var watchAll = function (obj, watcher, level) {
-
-        if (obj instanceof String || (!(obj instanceof Object) && !isArray(obj))) { //accepts only objects and array (not string)
-            return;
-        }
-
-        var props = [];
-
-
-        if(isArray(obj)) {
-            for (var prop = 0; prop < obj.length; prop++) { //for each item if obj is an array
-                props.push(prop); //put in the props
-            }
-        } else {
-            for (var prop2 in obj) { //for each attribute if obj is an object
-                props.push(prop2); //put in the props
-            }
-        }
-
-        watchMany(obj, props, watcher, level); //watch all itens of the props
-    };
-
-
-    var watchMany = function (obj, props, watcher, level) {
-
-        for (var prop in props) { //watch each attribute of "props" if is an object
-            watchOne(obj, props[prop], watcher, level);
-        }
-
-    };
-
-    var watchOne = function (obj, prop, watcher, level) {
-
-        if(isFunction(obj[prop])) { //dont watch if it is a function
-            return;
-        }
-
-        if(obj[prop] != null && (level === undefined || level > 0)){
-            if(level !== undefined){
-                level--;
-            }
-            watchAll(obj[prop], watcher, level); //recursively watch all attributes of this
-        }
-
-        defineWatcher(obj, prop, watcher);
-
-    };
-
-    var unwatch = function () {
-
-        if (isFunction(arguments[1])) {
-            unwatchAll.apply(this, arguments);
-        } else if (isArray(arguments[1])) {
-            unwatchMany.apply(this, arguments);
-        } else {
-            unwatchOne.apply(this, arguments);
-        }
-
-    };
-
-    var unwatchAll = function (obj, watcher) {
-
-        if (obj instanceof String || (!(obj instanceof Object) && !isArray(obj))) { //accepts only objects and array (not string)
-            return;
-        }
-
-        var props = [];
-
-
-        if (isArray(obj)) {
-            for (var prop = 0; prop < obj.length; prop++) { //for each item if obj is an array
-                props.push(prop); //put in the props
-            }
-        } else {
-            for (var prop2 in obj) { //for each attribute if obj is an object
-                props.push(prop2); //put in the props
-            }
-        }
-
-        unwatchMany(obj, props, watcher); //watch all itens of the props
-    };
-
-
-    var unwatchMany = function (obj, props, watcher) {
-
-        for (var prop2 in props) { //watch each attribute of "props" if is an object
-            unwatchOne(obj, props[prop2], watcher);
-        }
-    };
-
-    if(isModernBrowser()){
-
-        defineWatcher = function (obj, prop, watcher) {
-
-            var val = obj[prop];
-
-            watchFunctions(obj, prop);
-
-            if (!obj.watchers) {
-                defineProp(obj, "watchers", {});
-            }
-
-            if (!obj.watchers[prop]) {
-                obj.watchers[prop] = [];
-            }
-
-
-            obj.watchers[prop].push(watcher); //add the new watcher in the watchers array
-
-
-            var getter = function () {
-                return val;
-            };
-
-
-            var setter = function (newval) {
-                var oldval = val;
-                val = newval;
-
-                if (obj[prop]){
-                    watchAll(obj[prop], watcher);
-                }
-
-                watchFunctions(obj, prop);
-
-                if (!WatchJS.noMore){
-                    if (JSON.stringify(oldval) !== JSON.stringify(newval)) {
-                        callWatchers(obj, prop, "set", newval, oldval);
-                        WatchJS.noMore = false;
-                    }
-                }
-            };
-
-            defineGetAndSet(obj, prop, getter, setter);
-
-        };
-
-        callWatchers = function (obj, prop, action, newval, oldval) {
-
-            for (var wr in obj.watchers[prop]) {
-                if (isInt(wr)){
-                    obj.watchers[prop][wr].call(obj, prop, action, newval, oldval);
-                }
-            }
-        };
-
-        // @todo code related to "watchFunctions" is certainly buggy
-        var methodNames = ['pop', 'push', 'reverse', 'shift', 'sort', 'slice', 'unshift'];
-        var defineArrayMethodWatcher = function (obj, prop, original, methodName) {
-            defineProp(obj[prop], methodName, function () {
-                var response = original.apply(obj[prop], arguments);
-                watchOne(obj, obj[prop]);
-                if (methodName !== 'slice') {
-                    callWatchers(obj, prop, methodName,arguments);
-                }
-                return response;
-            });
-        };
-
-        var watchFunctions = function(obj, prop) {
-
-            if ((!obj[prop]) || (obj[prop] instanceof String) || (!isArray(obj[prop]))) {
-                return;
-            }
-
-            for (var i = methodNames.length, methodName; i--;) {
-                methodName = methodNames[i];
-                defineArrayMethodWatcher(obj, prop, obj[prop][methodName], methodName);
-            }
-
-        };
-
-        unwatchOne = function (obj, prop, watcher) {
-            for(var i in obj.watchers[prop]){
-                var w = obj.watchers[prop][i];
-
-                if(w == watcher) {
-                    obj.watchers[prop].splice(i, 1);
-                }
-            }
-        };
-
-    } else {
-        //this implementation dont work because it cant handle the gap between "settings".
-        //I mean, if you use a setter for an attribute after another setter of the same attribute it will only fire the second
-        //but I think we could think something to fix it
-
-        var subjects = [];
-
-        defineWatcher = function(obj, prop, watcher){
-
-            subjects.push({
-                obj: obj,
-                prop: prop,
-                serialized: JSON.stringify(obj[prop]),
-                watcher: watcher
-            });
-
-        };
-
-        unwatchOne = function (obj, prop, watcher) {
-
-            for (var i in subjects) {
-                var subj = subjects[i];
-
-                if (subj.obj == obj && subj.prop == prop && subj.watcher == watcher) {
-                    subjects.splice(i, 1);
-                }
-
-            }
-
-        };
-
-        callWatchers = function (obj, prop, action, value) {
-
-            for (var i in subjects) {
-                var subj = subjects[i];
-
-                if (subj.obj == obj && subj.prop == prop) {
-                    subj.watcher.call(obj, prop, action, value);
-                }
-
-            }
-
-        };
-
-        var loop = function(){
-
-            for(var i in subjects){
-
-                var subj = subjects[i];
-                var newSer = JSON.stringify(subj.obj[subj.prop]);
-                if(newSer != subj.serialized){
-                    subj.watcher.call(subj.obj, subj.prop, subj.obj[subj.prop], JSON.parse(subj.serialized));
-                    subj.serialized = newSer;
-                }
-
-            }
-
-        };
-
-        setInterval(loop, 50);
-
-    }
-
-    WatchJS.watch = watch;
-    WatchJS.unwatch = unwatch;
-    WatchJS.callWatchers = callWatchers;
-
-    return WatchJS;
-
-}));
 
 },{}]},{},[])
 ;
@@ -563,10 +237,15 @@ module.exports = {
         return this.$.list.items;
       },
       push: function(item) {
+        var length = this.items.length;
+
         if (this._isArray) {
           this.insert(this.items.length, item);
         } else {
-          this.set(this.items.length, item);
+          while (this._model.get(this.at + "." + length)) {
+            length += 1;
+          }
+          this.set(length, item);
         }
       },
       unshift: function(item) {
@@ -628,6 +307,7 @@ module.exports = {
         if (this._isArray) {
           ev = "update";
         } else {
+          if (key.indexOf(".") > -1) return;
           if (data) {
             if (this.get(key)) {
               ev = "update";
@@ -649,9 +329,9 @@ module.exports = {
       }
     });
   </script>
-  </element>
+</element>
 
-<element name="smart-post" attributes="model editable">
+<element name="smart-post" attributes="model editable" on-mouseover="editModeOn" on-mouseout="editModeOff">
   <template>
     <style>
       @host {
@@ -691,39 +371,19 @@ module.exports = {
         font-size: 15px;
       }
     </style>  
-    <button id="remove" style="display:none;">X</button>
+    <button id="remove" style="display:none;" on-click="remove">X</button>
     <div id="body" class="body"></div>
-    <textarea id="editableBody" class="body" style="display:none;"></textarea>
-    <button id="save" style="display:none;">Save</button>
+    <textarea id="editableBody" class="body" style="display:none;" value="{{model.body}}" on-keyup="showSaveButton"></textarea>
+    <button id="save" style="display:none;" on-click="save">Save</button>
   </template>
   <script>
     require=(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({"proto":[function(require,module,exports){
 module.exports=require('o1PFch');
 },{}],"o1PFch":[function(require,module,exports){
 module.exports = {
-  _model: {},
-
   ready: function() {
-    var self = this;
-    this.$.editableBody.addEventListener("keyup", function() {
-      self.$.save.style.display = "block";
-    });
-    this.$.save.addEventListener("click", this.save.bind(this));
-    this.$.remove.addEventListener("click", this.remove.bind(this));
-    this.addEventListener("mouseover", this.editModeOn);
-    this.addEventListener("mouseout", this.editModeOff);
-  },
-
-  set model(model) {
-    if (typeof model === "string") {
-      model = JSON.parse(model);
-    }
-    this._model = model;
-    this.$.editableBody.value = model.body;
+    this._ready = true;
     this.parseBody();
-  },
-  get model() {
-    return this._model;
   },
 
   set editable(flag) {
@@ -738,6 +398,36 @@ module.exports = {
     return this._editable;
   },
 
+  set model(model) {
+    if (typeof model === "string") {
+      model = JSON.parse(model);
+    }
+    this._model = model;
+    this.observeModel();
+  },
+  get model() {
+    if (!this._model) {
+      this.model = {
+        body: ""
+      };
+    }
+    return this._model;
+  },
+
+  observeModel: function() {
+    var key;
+
+    for (key in this.model) {
+      new PathObserver(this.model, key, function(inNew, inOld) {
+        if (inNew === inOld) return;
+        this[key + "Changed"](inOld);
+      }.bind(this));
+      this[key + "Changed"]();
+    }
+  },
+  showSaveButton: function() {
+    this.$.save.style.display = "block";
+  },
   parse: require("marked"),
   editModeOn: function() {
     if (!this.editable) return;
@@ -753,18 +443,28 @@ module.exports = {
     this.parseBody();
     this.onEditMode = false;
   },
+  bodyChanged: function() {
+    if (!this.onEditMode) {
+      this.parseBody();
+    }
+  },
   parseBody: function() {
+    if (!this._ready) return;
+    //Just to kickstart it, he's a little shy...
+    if (!this.$.editableBody.value) {
+      this.$.editableBody.value = this.model.body;
+    }
     this.$.body.innerHTML = this.parse(this.$.editableBody.value);
+    this.fire("update");
   },
   remove: function() {
     if (!this.parentNode) return;
     this.parentNode.removeChild(this);
-    this.dispatchEvent(new CustomEvent("remove"));
+    this.fire("remove");
   },
   save: function() {
-    this._model.body = this.$.editableBody.value;
     this.$.save.style.display = "none";
-    this.dispatchEvent(new CustomEvent("save"));
+    this.fire("save");
   }
 };
 
@@ -1951,7 +1651,7 @@ if (typeof exports === 'object') {
       }
     </style>
     <button id="new" style="display:none;">+</button>
-    <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true"></racer-collection>
+    <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true" on-model:load="onModelLoad" on-item:delete="onItemDelete"></racer-collection>
   </template>
   <script>
     Polymer.register(this, {
@@ -1981,18 +1681,28 @@ if (typeof exports === 'object') {
             self._unauthorize();
           }
         });
-        this.$.list.on("model:load", function() {
-          self.$.list.items.forEach(function(item, i) {
-            item.child.addEventListener("remove", function() {
-              self.$.list.del(i);
-            });
-          });
-          self.dispatchEvent(new CustomEvent("load"));
-        });
-        this.$.list.on("item:delete", function() {
-          self.dispatchEvent(new CustomEvent("post:delete"));
-        });
         this.$.list.model = model;
+      },
+      onItemDelete: function() {
+        this.fire("post:delete");
+      },
+      onModelLoad: function() {
+        var self = this,
+        count = 0;
+
+        this.$.list.items.forEach(function(item, i) {
+          var update = function() {
+            count++;
+            if (count >= self.$.list.items.length) {
+              item.child.removeEventListener(update);
+              self.fire("load");
+            }
+          };
+          item.child.addEventListener("update", update);
+          item.child.addEventListener("remove", function() {
+            self.$.list.del(i);
+          });
+        });
       },
       _authorize: function() {
         this.$.list.itemAttributes = {editable: true};
@@ -2012,4 +1722,4 @@ if (typeof exports === 'object') {
       }
     });
   </script>
-</element>
+  </element>

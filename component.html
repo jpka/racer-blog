@@ -20,7 +20,7 @@
       }
     </style>
     <button id="new" style="display:none;">+</button>
-    <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true"></racer-collection>
+    <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true" on-model:load="onModelLoad" on-item:delete="onItemDelete"></racer-collection>
   </template>
   <script>
     Polymer.register(this, {
@@ -50,18 +50,28 @@
             self._unauthorize();
           }
         });
-        this.$.list.on("model:load", function() {
-          self.$.list.items.forEach(function(item, i) {
-            item.child.addEventListener("remove", function() {
-              self.$.list.del(i);
-            });
-          });
-          self.dispatchEvent(new CustomEvent("load"));
-        });
-        this.$.list.on("item:delete", function() {
-          self.dispatchEvent(new CustomEvent("post:delete"));
-        });
         this.$.list.model = model;
+      },
+      onItemDelete: function() {
+        this.fire("post:delete");
+      },
+      onModelLoad: function() {
+        var self = this,
+        count = 0;
+
+        this.$.list.items.forEach(function(item, i) {
+          var update = function() {
+            count++;
+            if (count >= self.$.list.items.length) {
+              item.child.removeEventListener(update);
+              self.fire("load");
+            }
+          };
+          item.child.addEventListener("update", update);
+          item.child.addEventListener("remove", function() {
+            self.$.list.del(i);
+          });
+        });
       },
       _authorize: function() {
         this.$.list.itemAttributes = {editable: true};
@@ -81,4 +91,4 @@
       }
     });
   </script>
-</element>
+  </element>

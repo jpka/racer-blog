@@ -3,6 +3,7 @@ window.Model = function(modelData, populated) {
     events: {},
     digIn: function(path) {
       var data = this.data;
+      if (!path) return data;
       path.split(".").forEach(function(key) {
         if (!data) return;
         data = data[key];

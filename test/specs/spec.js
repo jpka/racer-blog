@@ -5,8 +5,10 @@ describe("racer-blog", function() {
   model;
 
   beforeEach(function(done) {
+    this.timeout(5000);
     fixtures.window().racer = null;
     element = fixtures.window().document.querySelector("#blog").cloneNode();
+    fixtures.window().document.body.appendChild(element);
     modelData = {
       _page: {
         authorized: true
@@ -15,9 +17,9 @@ describe("racer-blog", function() {
         posts: {}
       }
     };
-    modelData.blog.posts[0] = {body: "body"};
-    modelData.blog.posts[1] = {body: "another body"};
-    modelData.blog.posts[2] = {body: "yet another body"};
+    modelData.blog.posts[0] = {body: "one"};
+    modelData.blog.posts[1] = {body: "two"};
+    modelData.blog.posts[2] = {body: "three"};
     model = new fixtures.window().Model(modelData);
     element.racer = {
       ready: function(cb) {
@@ -66,6 +68,7 @@ describe("racer-blog", function() {
 
   it("doesn't start with editable state if not authorized", function(done) {
     var elem = fixtures.window().document.createElement("racer-blog");
+    fixtures.window().document.body.appendChild(elem);
     elem.collectionPath = "blog.posts";
     elem.addEventListener("load", function() {
       expect(elem.$.list.items[0].child.editable).to.not.equal(true);
