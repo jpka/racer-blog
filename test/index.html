@@ -17,12 +17,9 @@
       data.blog.posts[0] = {body: "#post1\nI am a merry post."};
       data.blog.posts[1] = {body: "#post2\nI am a merrier post."};
       data.blog.posts[2] = {body: "#post3\nI am the merriest post."};
-      window.model = new Model(data);
-      window.racer = {
-        ready: function(cb) {
-          cb(window.model);
-        }
-      };
+      window.addEventListener("WebComponentsReady", function() {
+        document.querySelector("#blog").model = new Model(data);
+      });
     </script>
   </head>
   <body>

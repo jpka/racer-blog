@@ -19,9 +19,6 @@
     Polymer.register(this, {
       newText: "Write here",
       ready: function() {
-        if (window.racer) {
-          this.racer = window.racer;  
-        }
         this.$.new.model.body = this.newText;
       },
       get posts() {
