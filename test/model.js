@@ -58,6 +58,7 @@ window.Model = function(modelData, populated) {
 
       this.digIn(pathArr.join("."))[key] = value;
       this.emit(path, "change", value);
+      this.emit(path, "load", value);
     },
     push: function(path, model) {
       return this.insert(path, this.digIn(path).length, model);

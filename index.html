@@ -39,10 +39,16 @@
         return this.$.container.querySelector("#" + id);
       },
       rm: function(id) {
-        this.$.container.removeChild(this.get(id));
+        var el = this.get(id);
+        if (el) {
+          this.$.container.removeChild(el);
+        }
       },
       rmByIndex: function(index) {
-        this.$.container.removeChild(this.items[index]);
+        var el = this.items[index];
+        if (el) {
+          this.$.container.removeChild(el);
+        }
       }
     });
   </script>
@@ -128,8 +134,6 @@ module.exports = {
       if (!this.child.model) this.child.model = {};
     }
 
-    if (!this.turbo) this.child.addEventListener("save", this.save.bind(this));
-
     this.listen();
 
     if (model.get(this.at)) {
@@ -143,20 +147,38 @@ module.exports = {
   get model() {
     return this._model;
   },
+  resolve: function(path) {
+    var resolved = [];
+    if (this.at) resolved.push(this.at);
+    if (path) resolved.push(path);
+    return resolved.join(".");
+  },
   del: function(path) {
-    if (this.at) path = this.at + "." + path;
-    this._model.del(path);
+    this._model.del(this.resolve(path));
+    this.fire("delete");
   },
   set: function(key, value) {
-    this._model.set(this.at ? this.at + "." + key : key, value);
+    this._model.set(this.resolve(key), value);
   },
   listen: function() {
     var self = this;
+
+    if (!this.turbo) {
+      this.child.addEventListener("save", function(e) {
+        e.stopPropagation();
+        self.save();
+      });
+    }
+    this.child.addEventListener("delete", function(e) {
+      e.stopPropagation();
+      self.del();
+    });
+
     this._model.on("all", "**", function(path, ev, data, oldData) {
       var args = [ev, path, data, oldData];
 
       if (self.at && self.at !== "") {
-        if (path.indexOf(self.at) === -1) return;
+        if (path.indexOf(self.at) !== 0) return;
         if (path === self.at) {
           args.splice(1, 1);
         } else {
@@ -185,6 +207,10 @@ module.exports = {
     for (key in this._childModel) {
       this.set(key, this._childModel[key]);
     }
+    this.fire("save");
+  },
+  reset: function() {
+    this.child.model = this._model.get(this.at);
   },
   onModelLoad: function() {
     this.update();
@@ -308,12 +334,8 @@ module.exports = {
           ev = "update";
         } else {
           if (key.indexOf(".") > -1) return;
-          if (data) {
-            if (this.get(key)) {
-              ev = "update";
-            } else {
-              ev = "create";
-            }
+          if (data && this.get(key)) {
+            ev = "update";
           } else {
             ev = "delete";
           }
@@ -321,17 +343,26 @@ module.exports = {
 
         this.trigger("item:" + ev, key, data);
       },
+      onLoad: function(key) {
+        if (this._isArray) return;
+        this.trigger("item:create", key);
+      },
       onInsert: function(i) {
         this.trigger("item:create", i);
       },
       onRemove: function(i) {
         this.trigger("item:delete", i);
+      },
+      reset: function() {
+        this.items.forEach(function(item) {
+          item.reset();
+        });
       }
     });
   </script>
 </element>
 
-<element name="smart-post" attributes="model editable" on-mouseover="editModeOn" on-mouseout="editModeOff">
+<element name="smart-post" attributes="model editable fixed" on-mouseover="editModeOn" on-mouseout="editModeOff">
   <template>
     <style>
       @host {
@@ -339,18 +370,20 @@ module.exports = {
           position: relative;
           display: block;
           width: 600px;
-          margin: 10px;
+          margin: 20px;
           border: 2px dashed black;
         }
       }
       .body {
         padding: 5px;
         width: 586px;
+        min-height: 3.5em;
       }
       #editableBody {
         top: 0px;
         left: 0px;
         border: none;
+        height: 3.5em;
       }
       button {
         position: absolute;
@@ -373,7 +406,7 @@ module.exports = {
     </style>  
     <button id="remove" style="display:none;" on-click="remove">X</button>
     <div id="body" class="body"></div>
-    <textarea id="editableBody" class="body" style="display:none;" value="{{model.body}}" on-keyup="showSaveButton"></textarea>
+    <textarea id="editableBody" class="body" style="display:none;" value="{{model.body}}"></textarea>
     <button id="save" style="display:none;" on-click="save">Save</button>
   </template>
   <script>
@@ -387,15 +420,19 @@ module.exports = {
   },
 
   set editable(flag) {
-    if (flag) {
-      this.$.remove.style.display = "block";
-    } else {
-      this.$.remove.style.display = "none";
-    }
     this._editable = flag;
+    this.updateRemoveButton();
   },
   get editable() {
-    return this._editable;
+    return this._editable || null;
+  },
+
+  set fixed(flag) {
+    this._fixed = flag;
+    this.updateRemoveButton();
+  },
+  get fixed() {
+    return this._fixed || null;
   },
 
   set model(model) {
@@ -414,19 +451,20 @@ module.exports = {
     return this._model;
   },
 
+  updateRemoveButton: function() {
+    this.$.remove.style.display = this.editable && !this.fixed ? "block" : "none";
+  },
   observeModel: function() {
-    var key;
+    var key, observer;
 
     for (key in this.model) {
-      new PathObserver(this.model, key, function(inNew, inOld) {
+      observer = new PathObserver(this.model, key, function(inNew, inOld) {
         if (inNew === inOld) return;
         this[key + "Changed"](inOld);
       }.bind(this));
+      Polymer.registerObserver(this, "property", key, observer);
       this[key + "Changed"]();
     }
-  },
-  showSaveButton: function() {
-    this.$.save.style.display = "block";
   },
   parse: require("marked"),
   editModeOn: function() {
@@ -443,7 +481,9 @@ module.exports = {
     this.parseBody();
     this.onEditMode = false;
   },
-  bodyChanged: function() {
+  bodyChanged: function(old) {
+    if (!this._ready) return;
+    this.$.save.style.display = old && this.model.body && this.model.body !== "" ? "block" : "none";
     if (!this.onEditMode) {
       this.parseBody();
     }
@@ -460,7 +500,7 @@ module.exports = {
   remove: function() {
     if (!this.parentNode) return;
     this.parentNode.removeChild(this);
-    this.fire("remove");
+    this.fire("delete");
   },
   save: function() {
     this.$.save.style.display = "none";
@@ -1640,26 +1680,23 @@ if (typeof exports === 'object') {
         }
       }
       #new {
-        margin: 0 auto;
-        border: none;
-        background: none;
-        font-size: 40px;
-        cursor: pointer;
-      }
-      #new:hover {
-        color: rgb(206, 26, 26);
+        border: 2px solid black !important;
       }
     </style>
-    <button id="new" style="display:none;">+</button>
+    <smart-post id="new" on-save="addNew" fixed="true" editable="true" style="display:none;"></smart-post>
     <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true" on-model:load="onModelLoad" on-item:delete="onItemDelete"></racer-collection>
   </template>
   <script>
     Polymer.register(this, {
+      newText: "Write here",
       ready: function() {
         if (window.racer) {
           this.racer = window.racer;  
         }
-        this.$.new.addEventListener("click", this.addNew.bind(this))
+        this.$.new.model.body = this.newText;
+      },
+      get posts() {
+        return this.$.list.items;
       },
       set racer(racer) {
         var self = this;
@@ -1673,8 +1710,6 @@ if (typeof exports === 'object') {
 
         if (model.get("_page.authorized")) {
           this._authorize();
-        } else {
-          this._unauthorize();
         }
         model.on("error", function(err) {
           if (err.message === "unauthorized") {
@@ -1699,9 +1734,6 @@ if (typeof exports === 'object') {
             }
           };
           item.child.addEventListener("update", update);
-          item.child.addEventListener("remove", function() {
-            self.$.list.del(i);
-          });
         });
       },
       _authorize: function() {
@@ -1711,15 +1743,15 @@ if (typeof exports === 'object') {
       _unauthorize: function() {
         this.$.list.itemAttributes = null;
         this.$.new.style.display = "none";
-        this.$.list.items.forEach(function(item) {
-          item.child.editable = null;
+        this.posts.forEach(function(post) {
+          post.reset();
+          post.child.editable = false;
         });
       },
       addNew: function() {
-        this.$.list.push({
-          body: ""
-        });
+        this.$.list.push(this.$.new.model);
+        this.$.new.model.body = this.newText;
       }
     });
   </script>
-  </element>
+</element>

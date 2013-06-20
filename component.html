@@ -9,26 +9,23 @@
         }
       }
       #new {
-        margin: 0 auto;
-        border: none;
-        background: none;
-        font-size: 40px;
-        cursor: pointer;
-      }
-      #new:hover {
-        color: rgb(206, 26, 26);
+        border: 2px solid black !important;
       }
     </style>
-    <button id="new" style="display:none;">+</button>
+    <smart-post id="new" on-save="addNew" fixed="true" editable="true" style="display:none;"></smart-post>
     <racer-list id="list" itemType="smart-post" listType="div" at="{{collectionPath}}" reverse="true" on-model:load="onModelLoad" on-item:delete="onItemDelete"></racer-collection>
   </template>
   <script>
     Polymer.register(this, {
+      newText: "Write here",
       ready: function() {
         if (window.racer) {
           this.racer = window.racer;  
         }
-        this.$.new.addEventListener("click", this.addNew.bind(this))
+        this.$.new.model.body = this.newText;
+      },
+      get posts() {
+        return this.$.list.items;
       },
       set racer(racer) {
         var self = this;
@@ -42,8 +39,6 @@
 
         if (model.get("_page.authorized")) {
           this._authorize();
-        } else {
-          this._unauthorize();
         }
         model.on("error", function(err) {
           if (err.message === "unauthorized") {
@@ -68,9 +63,6 @@
             }
           };
           item.child.addEventListener("update", update);
-          item.child.addEventListener("remove", function() {
-            self.$.list.del(i);
-          });
         });
       },
       _authorize: function() {
@@ -80,15 +72,15 @@
       _unauthorize: function() {
         this.$.list.itemAttributes = null;
         this.$.new.style.display = "none";
-        this.$.list.items.forEach(function(item) {
-          item.child.editable = null;
+        this.posts.forEach(function(post) {
+          post.reset();
+          post.child.editable = false;
         });
       },
       addNew: function() {
-        this.$.list.push({
-          body: ""
-        });
+        this.$.list.push(this.$.new.model);
+        this.$.new.model.body = this.newText;
       }
     });
   </script>
-  </element>
+</element>

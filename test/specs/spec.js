@@ -40,25 +40,20 @@ describe("racer-blog", function() {
     expect(coll.items[2].child.$.body.innerHTML).to.include(posts[0].body);
   });
 
-  it("pressing add generates an empty post at the top", function() {
+  it("saving #new generates a new post", function(done) {
     var click = fixtures.window().document.createEvent("MouseEvents");
     click.initEvent("click", true, false);
-    element.$.new.dispatchEvent(click);
+    element.$.new.model.body = "algo";
 
-    expect(coll.items.length).to.equal(4);
-    expect(coll.items[0].child.$.body.innerHTML).to.equal("");
-  });
-
-  it("pressing post remove button deletes the post from the model", function(done) {
-    var click = fixtures.window().document.createEvent("MouseEvents");
-    click.initEvent("click", true, false);
-
-    element.addEventListener("post:delete", function() {
-      expect(model.delWasCalledWith).to.deep.equal(["blog.posts.0"]);
-      expect(coll.items.length).to.equal(2);
-      done();
+    element.$.new.addEventListener("update", function() {
+      element.$.new.$.save.dispatchEvent(click);
+      setTimeout(function() {
+        expect(coll.items.length).to.equal(4);
+        expect(coll.items[0].child.$.body.innerHTML).to.include("algo");
+        done();
+      }, 1000);
     });
-    coll.items[0].child.$.remove.dispatchEvent(click);
+    element.$.new.parseBody();
   });
 
   it("starts with editable rights if authorized", function() {
@@ -83,9 +78,9 @@ describe("racer-blog", function() {
     setTimeout(function() {
       expect(coll.items[0].child.editable).to.not.equal(true);
       expect(element.$.new.style.display).to.equal("none");
-      element.addNew();
+      element.$.list.push({body: "a"});
       expect(coll.items[0].child.editable).to.not.equal(true);
       done();
-    }, 1000);
+    }, 1900);
   });
 });

@@ -1,5 +1,5 @@
 {
-  "name": "polyer-web-component-template",
+  "name": "racer-blog",
   "version": "0.0.0",
   "description": "",
   "directories": {
@@ -20,7 +20,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/jpka/polymer-web-component-template.git"
+    "url": "git://github.com/jpka/racer-blog.git"
   },
   "author": "Juan Pablo Kaniefsky",
   "license": "MIT"
