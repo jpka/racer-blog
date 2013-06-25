@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <script src="/polymer.js"></script>
+    <script src="/require.js"></script>
+    <link rel="import" href="/racer-blog.html">
+  </head>
+  <body>
+    <racer-blog id="blog" collectionPath="posts"></racer-blog>
+    <script>
+      require(["/racer"], function(racer) {
+        racer.load("/racer/blog", function(model) {
+          document.querySelector("#blog").model = model;
+        });
+      });
+    </script>
+  </body>
+</html>

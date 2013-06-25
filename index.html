@@ -139,7 +139,7 @@ module.exports = {
     if (model.get(this.at)) {
       this.trigger("model:load");
     } else {
-      model.subscribe(function() {
+      model.subscribe(this.at, function() {
         self.trigger("model:load");
       });
     }
@@ -344,7 +344,7 @@ module.exports = {
         this.trigger("item:" + ev, key, data);
       },
       onLoad: function(key) {
-        if (this._isArray) return;
+        if (this._isArray || this.get(key)) return;
         this.trigger("item:create", key);
       },
       onInsert: function(i) {

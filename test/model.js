@@ -36,8 +36,9 @@ window.Model = function(modelData, populated) {
         });
       }
     },
-    subscribe: function(cb) {
+    subscribe: function(at, cb) {
       var self = this;
+      if (arguments.length === 1) cb = at;
 
       setTimeout(function() {
         self.data = modelData;

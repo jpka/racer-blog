@@ -1,11 +1,12 @@
 {
   "name": "racer-blog",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "main": "index.html",
   "ignore": [
     "**/.*",
     "node_modules",
-    "components"
+    "components",
+    "example/db"
   ],
   "devDependencies": {
     "racer-list": "latest",
