@@ -10,10 +10,12 @@
     <racer-blog id="blog" collectionPath="posts"></racer-blog>
     <script>
       require(["/racer"], function(racer) {
-        racer.load("/racer/blog", function(model) {
-          document.querySelector("#blog").model = model;
+        window.addEventListener("WebComponentsReady", function() {  
+          racer.load("/racer/blog", function(model) {
+            document.querySelector("#blog").model = model;
+          });
         });
-      });
+     });
     </script>
   </body>
 </html>

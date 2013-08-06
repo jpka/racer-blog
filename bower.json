@@ -8,8 +8,11 @@
     "components",
     "example/db"
   ],
-  "devDependencies": {
+  "dependencies": {
     "racer-list": "latest",
     "smart-post": "latest"
+  },
+  "devDependencies": {
+    "polymer": "latest"
   }
 }

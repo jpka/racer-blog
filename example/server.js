@@ -4,6 +4,7 @@ path = require("path"),
 app = express();
 
 app.use(express.cookieParser());
+app.use("/components", express.static("components"));
 
 /* Dummy cookie auth */
 app.get("/login", function(req, res) {
@@ -41,7 +42,7 @@ app.get("/require.js", function(req, res) {
 
 app.get("/polymer.js", function(req, res) {
   res.setHeader("Content-Type", "text/javascript");
-  res.end(fs.readFileSync(path.resolve(__dirname, "../node_modules/Polymer/polymer.min.js"), "utf8"));
+  res.end(fs.readFileSync(path.resolve(__dirname, "../components/polymer/polymer.min.js"), "utf8"));
 });
 
 app.get("/racer-blog.html", function(req, res) {
